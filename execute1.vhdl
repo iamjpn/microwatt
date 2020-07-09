@@ -769,6 +769,8 @@ begin
                     when SPR_PVR =>
                         spr_val(63 downto 32) := (others => '0');
                         spr_val(31 downto 0) := PVR_MICROWATT;
+                    when SPR_CIABR =>
+                        spr_val := ctrl.ciabr;
                     when 724 =>     -- LOG_ADDR SPR
                         spr_val := log_wr_addr & r.log_addr_spr;
                     when 725 =>     -- LOG_DATA SPR
@@ -847,6 +849,8 @@ begin
 		    case decode_spr_num(e_in.insn) is
 		    when SPR_DEC =>
 			ctrl_tmp.dec <= c_in;
+		    when SPR_CIABR =>
+			ctrl_tmp.ciabr <= c_in;
                     when 724 =>     -- LOG_ADDR SPR
                         v.log_addr_spr := c_in(31 downto 0);
 		    when others =>
@@ -988,6 +992,19 @@ begin
 		v.mul_in_progress := r.mul_in_progress;
 		v.div_in_progress := r.div_in_progress;
 	    end if;
+	end if;
+
+	-- Check CIABR
+	if e_in.nia(63 downto 2) = ctrl.ciabr(63 downto 2) then
+		if ((ctrl.msr(MSR_PR) = '1' and ctrl.ciabr(1 downto 0) = "01") or
+		    (ctrl.msr(MSR_PR) = '0' and ctrl.ciabr(1 downto 0) = "10")) then
+			exception := '1';
+			exception_nextpc := '1';
+			v.f.redirect_nia := std_logic_vector(to_unsigned(16#D00#, 64));
+			-- set bit 43 to say CIABR match occurred
+			ctrl_tmp.srr1(63 - 43) <= '1';
+		report "ciabr";
+		end if;
 	end if;
 
         if illegal = '1' then
